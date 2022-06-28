@@ -196,6 +196,10 @@ void hardware_setup( void ) {
     /**
      * driver init
      */
+    pmu_setup();
+    log_i("Do OCV measurement to correct battery chagre");
+    uint32_t ocv_charge = (ttgo->power->getBattPercentage() * 300) / 100; 
+    pmu_set_ocv_charge(ocv_charge);                                    
     sdcard_setup();
     powermgm_setup();
     button_setup();
@@ -227,7 +231,6 @@ void hardware_setup( void ) {
     #endif
     splash_screen_stage_update( "init hardware", 60 );  
 
-    pmu_setup();
     bma_setup();
     wifictl_setup();
     touch_setup();

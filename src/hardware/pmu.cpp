@@ -67,6 +67,8 @@
 callback_t *pmu_callback = NULL;
 pmu_config_t pmu_config;
 
+static float pmu_actual_charge = 0;
+
 bool pmu_powermgm_event_cb( EventBits_t event, void *arg );
 bool pmu_powermgm_loop_cb( EventBits_t event, void *arg );
 bool pmu_blectl_event_cb( EventBits_t event, void *arg );
@@ -789,12 +791,27 @@ int32_t pmu_get_battery_percent( void ) {
         #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
             TTGOClass *ttgo = TTGOClass::getWatch();
 
+            pmu_actual_charge -= 65536.0 * 0.5 * (ttgo->power->getBattDischargeCoulomb()) / 3600.0 / ttgo->power->getAdcSamplingRate();
+            pmu_actual_charge += 65536.0 * 0.5 * (ttgo->power->getBattChargeCoulomb()) / 3600.0 / ttgo->power->getAdcSamplingRate();
+            ttgo->power->ClearCoulombcounter();
+            if (pmu_actual_charge > pmu_config.designed_battery_cap) {
+                pmu_actual_charge = pmu_config.designed_battery_cap;
+            } 
+            else if (pmu_actual_charge < 0.0) {
+                pmu_actual_charge = 1;
+            }
+
+            if (pmu_is_vbus_plug() && !pmu_is_charging()) {
+                pmu_actual_charge = pmu_config.designed_battery_cap;
+            }
+            /*
             if ( ttgo->power->getBattChargeCoulomb() < ttgo->power->getBattDischargeCoulomb() || ttgo->power->getBattVoltage() < 3200 ) {
                 ttgo->power->ClearCoulombcounter();
             }
+            */
 
             if ( pmu_get_calculated_percent() ) {
-                percent = ( ttgo->power->getCoulombData() / pmu_config.designed_battery_cap ) * 100;
+                percent = ( pmu_actual_charge / pmu_config.designed_battery_cap ) * 100;
             }
             else {
                 percent = ttgo->power->getBattPercentage();
@@ -807,6 +824,10 @@ int32_t pmu_get_battery_percent( void ) {
         #endif
     #endif
     return( percent );
+}
+
+void pmu_set_ocv_charge( uint32_t value ) {
+    pmu_actual_charge = value;
 }
 
 float pmu_get_battery_voltage( void ) {
@@ -900,7 +921,8 @@ float pmu_get_coulumb_data( void ) {
             coulumb_data = M5.Axp.GetCoulombData();
         #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
             TTGOClass *ttgo = TTGOClass::getWatch();
-            coulumb_data = ttgo->power->getCoulombData();
+            //coulumb_data = ttgo->power->getCoulombData();
+            coulumb_data = pmu_actual_charge;
         #endif
     #endif
 

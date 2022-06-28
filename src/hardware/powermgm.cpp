@@ -24,6 +24,7 @@
 #include "powermgm.h"
 #include "callback.h"
 #include "button.h"
+#include "pmu.h"
 
 #ifdef NATIVE_64BIT 
     #include <unistd.h>

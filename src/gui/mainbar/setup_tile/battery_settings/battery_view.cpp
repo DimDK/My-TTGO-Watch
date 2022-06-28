@@ -154,12 +154,8 @@ void battery_hibernate_cb( void ) {
 void battery_view_update_task( lv_task_t *task ) {
     char temp[16]="";
 
-    if ( pmu_get_battery_percent( ) >= 0 ) {
         snprintf( temp, sizeof( temp ), "%0.1fmAh", pmu_get_coulumb_data() );
-    }
-    else {
-        snprintf( temp, sizeof( temp ), "unknown" );        
-    }
+
     lv_label_set_text( battery_view_current_cap, temp );
     lv_obj_align( battery_view_current_cap, lv_obj_get_parent( battery_view_current_cap ), LV_ALIGN_IN_RIGHT_MID, -5, 0 );
 

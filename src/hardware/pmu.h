@@ -97,6 +97,13 @@
      */
     void pmu_set_calculated_percent( bool value );
     /**
+     * @brief Set the coulumb value. Has to be measured during minimal load
+     *        on the battery.
+     * 
+     * @param   value   Converted percentage to coulumb value
+     */
+    void pmu_set_ocv_charge( uint32_t value );
+    /**
      * @brief set experimental power save
      * 
      * @param   value   true enable experiemental power save settings
