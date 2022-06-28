@@ -67,12 +67,13 @@
 callback_t *pmu_callback = NULL;
 pmu_config_t pmu_config;
 
-static float pmu_actual_charge = 0;
+volatile float pmu_actual_charge = 0;
 
 bool pmu_powermgm_event_cb( EventBits_t event, void *arg );
 bool pmu_powermgm_loop_cb( EventBits_t event, void *arg );
 bool pmu_blectl_event_cb( EventBits_t event, void *arg );
 bool pmu_send_cb( EventBits_t event, void *arg );
+static void CoulombUpdate( void );
 
 void pmu_setup( void ) {
     /*
@@ -94,6 +95,7 @@ void pmu_setup( void ) {
         M5.Axp.SetAdcState( true );
     #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
         TTGOClass *ttgo = TTGOClass::getWatch();
+
         /**
          * if ADC sampling rate != 200, init charging current, samplingrate and coulomcounter
          */
@@ -235,7 +237,6 @@ void pmu_loop( void ) {
     static uint64_t nextmillis = 0;
     static int32_t percent = pmu_get_battery_percent();
     int32_t tmp_percent = 0;
-
 #ifdef NATIVE_64BIT
     static bool plug = false;
     static bool charging = false;
@@ -446,6 +447,8 @@ void pmu_loop( void ) {
         else {
             nextmillis = millis() + 10000L;
         }
+        CoulombUpdate();
+        log_i("Inside pmu looop!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
         /*
          * only update if an change is detected
          */
@@ -790,20 +793,6 @@ int32_t pmu_get_battery_percent( void ) {
             }
         #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
             TTGOClass *ttgo = TTGOClass::getWatch();
-
-            pmu_actual_charge -= 65536.0 * 0.5 * (ttgo->power->getBattDischargeCoulomb()) / 3600.0 / ttgo->power->getAdcSamplingRate();
-            pmu_actual_charge += 65536.0 * 0.5 * (ttgo->power->getBattChargeCoulomb()) / 3600.0 / ttgo->power->getAdcSamplingRate();
-            ttgo->power->ClearCoulombcounter();
-            if (pmu_actual_charge > pmu_config.designed_battery_cap) {
-                pmu_actual_charge = pmu_config.designed_battery_cap;
-            } 
-            else if (pmu_actual_charge < 0.0) {
-                pmu_actual_charge = 1;
-            }
-
-            if (pmu_is_vbus_plug() && !pmu_is_charging()) {
-                pmu_actual_charge = pmu_config.designed_battery_cap;
-            }
             /*
             if ( ttgo->power->getBattChargeCoulomb() < ttgo->power->getBattDischargeCoulomb() || ttgo->power->getBattVoltage() < 3200 ) {
                 ttgo->power->ClearCoulombcounter();
@@ -963,4 +952,26 @@ bool pmu_is_vbus_plug( void ) {
     #endif
 
     return( plug );
+}
+
+static void CoulombUpdate(void) {
+    TTGOClass *ttgo = TTGOClass::getWatch();
+
+    log_i("Charge before run %0.2f", pmu_actual_charge);
+    pmu_actual_charge -= 65536.0 * 0.5 * (ttgo->power->getBattDischargeCoulomb()) / 3600.0 / ttgo->power->getAdcSamplingRate();
+    log_i("Charge first run %0.2f", pmu_actual_charge);
+    pmu_actual_charge += 65536.0 * 0.5 * (ttgo->power->getBattChargeCoulomb()) / 3600.0 / ttgo->power->getAdcSamplingRate();
+    log_i("Charge second run %0.2f", pmu_actual_charge);
+    ttgo->power->ClearCoulombcounter();
+
+    if (pmu_actual_charge >= pmu_config.designed_battery_cap) {
+        pmu_actual_charge = pmu_config.designed_battery_cap - 1;
+    } 
+    else if (pmu_actual_charge < 0.0) {
+        pmu_actual_charge = 1;
+    }
+
+    if (pmu_is_vbus_plug() && !pmu_is_charging()) {
+        pmu_actual_charge = pmu_config.designed_battery_cap;
+    }
 }
